@@ -1,56 +1,71 @@
-import { cookies } from "next/headers";
-import { createClient } from "@/utils/supabase/server";
-import LogoutButton from "./logout-button";
-import ThemeToggle from "./theme-toggle";
+import { createClient } from '@/utils/supabase/server'
+import { cookies } from 'next/headers'
+import Link from 'next/link'
 
 export default async function DashboardPage() {
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const cookieStore = await cookies()
+  const supabase = createClient(cookieStore)
 
   const { data: transactions, error } = await supabase
-    .from("transactions")
-    .select("*")
-    .eq("user_id", user?.id)
-    .order("created_at", { ascending: false });
+    .from('transactions')
+    .select('type, amount')
 
-  // baca preferensi dari cookie, default 'light'
-  const theme = cookieStore.get("theme")?.value ?? "light";
+  if (error) {
+    return <p className="text-red-600 text-sm p-6">Gagal memuat data: {error.message}</p>
+  }
+
+  const totalIncome =
+    transactions
+      ?.filter((t) => t.type === 'income')
+      .reduce((sum, t) => sum + Number(t.amount), 0) ?? 0
+
+  const totalExpense =
+    transactions
+      ?.filter((t) => t.type === 'expense')
+      .reduce((sum, t) => sum + Number(t.amount), 0) ?? 0
+
+  const balance = totalIncome - totalExpense
+
+  const formatRupiah = (value: number) =>
+    `Rp${value.toLocaleString('id-ID')}`
 
   return (
-    <div data-theme={theme} style={{ minHeight: "100vh", padding: 16 }}>
-      <div>
-        <h1>Dashboard</h1>
-        <ThemeToggle currentTheme={theme} />
-        <LogoutButton />
+    <div className="p-6 max-w-2xl mx-auto space-y-6">
+      <h1 className="text-2xl font-bold">Dashboard Keuangan</h1>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="border rounded-lg p-4">
+          <p className="text-sm text-gray-500">Saldo</p>
+          <p
+            className={`text-2xl font-bold ${
+              balance >= 0 ? 'text-green-600' : 'text-red-600'
+            }`}
+          >
+            {formatRupiah(balance)}
+          </p>
+        </div>
+
+        <div className="border rounded-lg p-4">
+          <p className="text-sm text-gray-500">Total Pemasukan</p>
+          <p className="text-2xl font-bold text-green-600">
+            {formatRupiah(totalIncome)}
+          </p>
+        </div>
+
+        <div className="border rounded-lg p-4">
+          <p className="text-sm text-gray-500">Total Pengeluaran</p>
+          <p className="text-2xl font-bold text-red-600">
+            {formatRupiah(totalExpense)}
+          </p>
+        </div>
       </div>
 
-      <p>Login sebagai: {user?.email}</p>
-      <p>Tema saat ini: {theme}</p>
-
-      {error && <p>Gagal ambil data: {error.message}</p>}
-
-      <table border={1}>
-        <thead>
-          <tr>
-            <th>Tipe</th>
-            <th>Jumlah</th>
-            <th>Deskripsi</th>
-          </tr>
-        </thead>
-        <tbody>
-          {transactions?.map((t) => (
-            <tr key={t.id}>
-              <td>{t.type}</td>
-              <td>{t.amount}</td>
-              <td>{t.description}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <Link
+        href="/dashboard/transactions"
+        className="inline-block bg-blue-600 text-white px-4 py-2 rounded"
+      >
+        Kelola Transaksi
+      </Link>
     </div>
-  );
+  )
 }
