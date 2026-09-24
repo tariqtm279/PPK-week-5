@@ -112,3 +112,44 @@ export async function updateTransaction(
   revalidatePath('/dashboard')
   return { success: true }
 }
+
+export async function deleteTransaction(transactionId: string) {
+  const cookieStore = await cookies()
+  const supabase = createClient(cookieStore)
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { error: 'Anda harus login terlebih dahulu' }
+  }
+
+  // Validasi kepemilikan eksplisit sebelum hapus
+  const { data: existing, error: fetchError } = await supabase
+    .from('transactions')
+    .select('user_id')
+    .eq('id', transactionId)
+    .single()
+
+  if (fetchError || !existing) {
+    return { error: 'Transaksi tidak ditemukan' }
+  }
+
+  if (existing.user_id !== user.id) {
+    return { error: 'Anda tidak memiliki akses untuk menghapus transaksi ini' }
+  }
+
+  const { error } = await supabase
+    .from('transactions')
+    .delete()
+    .eq('id', transactionId)
+    .eq('user_id', user.id) // defense in depth, selain RLS
+
+  if (error) {
+    return { error: 'Gagal menghapus transaksi: ' + error.message }
+  }
+
+  revalidatePath('/dashboard')
+  return { success: true }
+}
