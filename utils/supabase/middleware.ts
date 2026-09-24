@@ -30,7 +30,18 @@ export const updateSession = async (request: NextRequest) => {
   );
 
   // Refresh auth token session
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // Proteksi route: kalau belum login dan akses /dashboard, tendang ke /login
+  const isProtected = request.nextUrl.pathname.startsWith("/dashboard");
+
+  if (!user && isProtected) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    return NextResponse.redirect(url);
+  }
 
   return supabaseResponse;
 };
